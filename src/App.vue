@@ -36,8 +36,9 @@
             </span>
             </div>
             <div v-if="double"
-                class="text-sm text-red-600"
-            >Такой тикер уже добавлен</div>
+                 class="text-sm text-red-600"
+            >Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
@@ -62,13 +63,32 @@
         </button>
       </section>
       <template v-if="tickers.length">
+        <hr class="w-full border-t border-gray-600 my-4"/>
+        <div>
+          <button
+              v-if="page > 1"
+              @click="page--"
+              class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Назад
+          </button>
+          <button
+              @click="page++"
+              v-if="hasNextPage"
+              class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Вперед
+          </button>
+          <div>Фильтр: <input v-model="filter"/></div>
+        </div>
+
 
         <hr
             class="w-full border-t border-gray-600 my-4"
         />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-              v-for="t in tickers"
+              v-for="t in paginationTickers"
               @click="select(t)"
               :key="t.name"
               :class="{
@@ -115,7 +135,7 @@
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-              v-for="(bar, idx) in normalizeGraph()"
+              v-for="(bar, idx) in normalizeGraph"
               :key="idx"
               :style="{
                 height: `${bar}%`
@@ -161,13 +181,28 @@ export default {
   data() {
     return {
       ticker: "",
+      filter: "",
+
       tickers: [],
       sel: null,
       double: false,
+      page: 1,
+
       graph: []
     }
   },
   created() {
+    const windowData = Object.fromEntries(
+        new URL(window.location).searchParams.entries()
+    )
+
+    if (windowData.filter){
+      this.filter = windowData.filter
+    }
+    if (windowData.page){
+      this.page = windowData.page
+    }
+
     const tickerData = localStorage.getItem('crypto')
     if (tickerData) {
       this.tickers = JSON.parse(tickerData)
@@ -177,29 +212,70 @@ export default {
     }
   },
 
-  methods: {
-    subscribeToUpdate(tickerName) {
-      setInterval(async () => {
-        const f = await fetch(
-            `https://min-api.cryptocompare.com/data/price?fsym=${ tickerName }&tsyms=USD&api_key=5e9a4d78aa05677fa4b3a6805bc0bbafdb3c521f1a061beb4ccd60a3bdce615d`
-        )
-        const data = await f.json()
-        this.tickers.find(t => t.name === tickerName).price =
-            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
-        if (this.sel?.name === tickerName) {
-          this.graph.push(data.USD)
-        }
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 6
+    },
+    endIndex() {
+      return this.page * 6
+    },
+    filteredList() {
+      return this.tickers.filter(t => t.name.includes(this.filter))
+    },
+    paginationTickers() {
+      return this.filteredList.slice(this.startIndex, this.endIndex)
+    },
+    hasNextPage() {
+      return this.filteredList.length > this.endIndex
+    },
 
-      }, 3000)
+    normalizeGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+      return this.graph.map(
+          price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page
+      }
+    }
+  },
+
+  methods: {
+
+    subscribeToUpdate(tickerName) {
+      // setInterval(async () => {
+      //   const f = await fetch(
+      //       `https://min-api.cryptocompare.com/data/price?fsym=${ tickerName }&tsyms=USD&api_key=5e9a4d78aa05677fa4b3a6805bc0bbafdb3c521f1a061beb4ccd60a3bdce615d`
+      //   )
+      //   const data = await f.json()
+      //   this.tickers.find(t => t.name === tickerName).price =
+      //       data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
+      //   if (this.sel?.name === tickerName) {
+      //     this.graph.push(data.USD)
+      //   }
+      //
+      // }, 3000)
     },
 
     add() {
       const newTickers = {
-        name: this.ticker,
+        name: this.ticker.toUpperCase(),
         price: "-"
       }
-      this.tickers.push(newTickers)
-      localStorage.setItem('crypto', JSON.stringify(this.tickers))
+      const index = this.tickers.findIndex(t => t.name === newTickers.name)
+      if (index === -1){
+        this.tickers = [...this.tickers, newTickers]
+        this.double = false
+      } else {
+        this.double = true
+      }
+
+
       this.subscribeToUpdate(newTickers.name)
       this.ticker = ""
 
@@ -208,24 +284,38 @@ export default {
       this.tickers = this.tickers.filter(t => t !== to)
       this.sel = null
     },
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-      return this.graph.map(
-          price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      );
-    },
-    doubleTicker() {
-     let index = this.tickers.findIndex(t => this.ticker === t.name)
-      console.log(index)
-      if (index === -1)
-        return
-    },
+
     select(ticker) {
       this.sel = ticker
-      this.graph = []
-    }
 
+    }
+  },
+
+
+  watch: {
+    tickers() {
+      localStorage.setItem('crypto', JSON.stringify(this.tickers))
+    },
+    sel() {
+      this.graph = []
+    },
+
+    paginationTickers() {
+      if (this.paginationTickers.length === 0 && this.page > 1){
+        this.page -= 1
+      }
+    },
+
+   filter() {
+     this.page = 1
+   },
+    pageStateOptions(v) {
+      window.history.pushState(
+          null,
+          document.title,
+          `${window.location.pathname}?filter=${v.filter}&page=${v.page}`
+      )
+    }
   }
 }
 
