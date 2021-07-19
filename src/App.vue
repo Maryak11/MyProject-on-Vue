@@ -106,7 +106,7 @@
             </div>
             <div class="w-full border-t border-gray-200"></div>
             <button
-                @click.stop="handleDelete(t)"
+                @click.stop="handleDelete(t.name)"
                 class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
             >
               <svg
@@ -173,7 +173,7 @@
 </template>
 
 <script>
-
+import { LoadTicker, subscribeToTicker, unsubscribeToTicker } from "./api";
 
 export default {
   name: 'App',
@@ -196,10 +196,10 @@ export default {
         new URL(window.location).searchParams.entries()
     )
 
-    if (windowData.filter){
+    if (windowData.filter) {
       this.filter = windowData.filter
     }
-    if (windowData.page){
+    if (windowData.page) {
       this.page = windowData.page
     }
 
@@ -207,12 +207,18 @@ export default {
     if (tickerData) {
       this.tickers = JSON.parse(tickerData)
       this.tickers.forEach(t => {
-        this.subscribeToUpdate(t.name)
+        subscribeToTicker(t.name, price => {
+          this.upDateTicker(t.name, price)
+        })
       })
     }
+
+    // setInterval(this.updateTickers, 5000)
   },
 
   computed: {
+
+
     startIndex() {
       return (this.page - 1) * 6
     },
@@ -247,19 +253,27 @@ export default {
 
   methods: {
 
-    subscribeToUpdate(tickerName) {
-      // setInterval(async () => {
-      //   const f = await fetch(
-      //       `https://min-api.cryptocompare.com/data/price?fsym=${ tickerName }&tsyms=USD&api_key=5e9a4d78aa05677fa4b3a6805bc0bbafdb3c521f1a061beb4ccd60a3bdce615d`
-      //   )
-      //   const data = await f.json()
-      //   this.tickers.find(t => t.name === tickerName).price =
-      //       data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
-      //   if (this.sel?.name === tickerName) {
-      //     this.graph.push(data.USD)
-      //   }
-      //
-      // }, 3000)
+    // async updateTickers() {
+    //   if (!this.tickers.length) {
+    //     return;
+    //   }
+    //   let data = await LoadTicker(this.tickers.map(t => t.name));
+    //   console.log(data)
+    //   console.log(this.tickers)
+    //     this.tickers.forEach(ticker => {
+    //       const price = data[ticker.name.toUpperCase()]
+    //       ticker.price = price ? (1/ price) : '-'
+    //     })
+    //     // this.tickers.find(t => t.name === tickerName).price =
+    //     //     data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
+    //     // if (this.sel?.name === tickerName) {
+    //     //   this.graph.push(data.USD)
+    //     // }
+    // },
+    upDateTicker(tickerName, price) {
+      this.tickers.filter(t => t.name === tickerName).forEach(t => {
+        t.price = price
+      })
     },
 
     add() {
@@ -268,20 +282,20 @@ export default {
         price: "-"
       }
       const index = this.tickers.findIndex(t => t.name === newTickers.name)
-      if (index === -1){
+      if (index === -1) {
         this.tickers = [...this.tickers, newTickers]
+        subscribeToTicker(newTickers.name, newPrice =>
+        this.upDateTicker(newTickers.name, newPrice)
+        )
+        this.ticker = ""
         this.double = false
       } else {
         this.double = true
       }
-
-
-      this.subscribeToUpdate(newTickers.name)
-      this.ticker = ""
-
     },
-    handleDelete(to) {
-      this.tickers = this.tickers.filter(t => t !== to)
+    handleDelete(tickerName) {
+      this.tickers = this.tickers.filter(t => t.name !== tickerName)
+      unsubscribeToTicker(tickerName)
       this.sel = null
     },
 
@@ -301,19 +315,19 @@ export default {
     },
 
     paginationTickers() {
-      if (this.paginationTickers.length === 0 && this.page > 1){
+      if (this.paginationTickers.length === 0 && this.page > 1) {
         this.page -= 1
       }
     },
 
-   filter() {
-     this.page = 1
-   },
+    filter() {
+      this.page = 1
+    },
     pageStateOptions(v) {
       window.history.pushState(
           null,
           document.title,
-          `${window.location.pathname}?filter=${v.filter}&page=${v.page}`
+          `${ window.location.pathname }?filter=${ v.filter }&page=${ v.page }`
       )
     }
   }
