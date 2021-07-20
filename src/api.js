@@ -60,4 +60,11 @@ export const unsubscribeToTicker = (ticker) => {
   unSubscribeToTickerOnWb(ticker)
 }
 
+export const loadTicker = () => {
+ return  axios
+    .get(`https://min-api.cryptocompare.com/data/blockchain/list?api_key=eee61455ba6ef99a1741c527e93e4bdd2ae9fcb055d4f2a873f95d2416036466`)
+    .then(response => {
+     return Object.keys(response.data.Data)
+    })
+}
 window.tickers = tickers

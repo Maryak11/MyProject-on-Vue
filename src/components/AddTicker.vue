@@ -39,6 +39,7 @@
 
 <script>
 import AddButton from "./AddButton.vue";
+import {loadTicker} from "../api";
 import axios from "axios";
 
 
@@ -69,18 +70,15 @@ export default {
       allCoins: []
     }
   },
-  mounted() {
-    axios
-        .get(`https://min-api.cryptocompare.com/data/blockchain/list?api_key=eee61455ba6ef99a1741c527e93e4bdd2ae9fcb055d4f2a873f95d2416036466`)
-        .then(response => {
-          this.allCoins = Object.keys(response.data.Data)
-          console.log(this.allCoins)
-        })
+  async mounted() {
+   this.allCoins = await loadTicker()
   },
 
   computed: {
+
     filteredCoins() {
-      return this.allCoins.filter(coin => coin.includes(this.ticker.toUpperCase()))
+      if (this.allCoins.length) return this.allCoins.filter(coin => coin.includes(this.ticker.toUpperCase()))
+      return []
     },
     paginationCoins() {
       const startIndexInValid = 0
