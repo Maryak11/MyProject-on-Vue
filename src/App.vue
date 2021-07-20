@@ -1,67 +1,7 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div class="container">
-      <section>
-        <div class="flex">
-          <div class="max-w-xs">
-            <label for="wallet" class="block text-sm font-medium text-gray-700"
-            >Тикер</label
-            >
-            <div class="mt-1 relative rounded-md shadow-md">
-              <input
-                  type="text"
-                  v-model="ticker"
-                  name="wallet"
-                  id="wallet"
-                  class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
-                  placeholder="Например DOGE"
-              />
-            </div>
-            <div class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap">
-            <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              BTC
-            </span>
-              <span
-                  class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              DOGE
-            </span>
-              <span
-                  class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              BCH
-            </span>
-              <span
-                  class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              CHD
-            </span>
-            </div>
-            <div v-if="double"
-                 class="text-sm text-red-600"
-            >Такой тикер уже добавлен
-            </div>
-          </div>
-        </div>
-        <button
-            @click="add"
-            type="button"
-            class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-        >
-          <!-- Heroicon name: solid/mail -->
-          <svg
-              class="-ml-0.5 mr-2 h-6 w-6"
-              xmlns="http://www.w3.org/2000/svg"
-              width="30"
-              height="30"
-              viewBox="0 0 24 24"
-              fill="#ffffff"
-          >
-            <path
-                d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
-            ></path>
-          </svg>
-          Добавить
-        </button>
-      </section>
+      <add-ticker @add-ticker="add" :disabled="tooManyCoinsAdded" :double="double"/>
       <template v-if="tickers.length">
         <hr class="w-full border-t border-gray-600 my-4"/>
         <div>
@@ -133,7 +73,9 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ sel.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div
+            ref="graph"
+            class="flex items-end border-gray-600 border-b border-l h-64">
           <div
               v-for="(bar, idx) in normalizeGraph"
               :key="idx"
@@ -173,17 +115,23 @@
 </template>
 
 <script>
-import { LoadTicker, subscribeToTicker, unsubscribeToTicker } from "./api";
+import { subscribeToTicker, unsubscribeToTicker, } from "./api";
+import AddTicker from "./components/AddTicker.vue";
 
 export default {
   name: 'App',
+  components: {
+    AddTicker
+  },
+
 
   data() {
     return {
-      ticker: "",
       filter: "",
 
       tickers: [],
+      allCoin: [],
+      maxGraphElements: 1,
       sel: null,
       double: false,
       page: 1,
@@ -191,7 +139,13 @@ export default {
       graph: []
     }
   },
+  mounted() {
+
+
+    window.addEventListener('resize', this.calculateMaxGraphEl)
+  },
   created() {
+
     const windowData = Object.fromEntries(
         new URL(window.location).searchParams.entries()
     )
@@ -202,7 +156,6 @@ export default {
     if (windowData.page) {
       this.page = windowData.page
     }
-
     const tickerData = localStorage.getItem('crypto')
     if (tickerData) {
       this.tickers = JSON.parse(tickerData)
@@ -212,13 +165,12 @@ export default {
         })
       })
     }
-
-    // setInterval(this.updateTickers, 5000)
   },
 
   computed: {
-
-
+    tooManyCoinsAdded() {
+      return this.tickers.length > 4
+    },
     startIndex() {
       return (this.page - 1) * 6
     },
@@ -252,42 +204,38 @@ export default {
   },
 
   methods: {
-
-    // async updateTickers() {
-    //   if (!this.tickers.length) {
-    //     return;
-    //   }
-    //   let data = await LoadTicker(this.tickers.map(t => t.name));
-    //   console.log(data)
-    //   console.log(this.tickers)
-    //     this.tickers.forEach(ticker => {
-    //       const price = data[ticker.name.toUpperCase()]
-    //       ticker.price = price ? (1/ price) : '-'
-    //     })
-    //     // this.tickers.find(t => t.name === tickerName).price =
-    //     //     data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
-    //     // if (this.sel?.name === tickerName) {
-    //     //   this.graph.push(data.USD)
-    //     // }
-    // },
     upDateTicker(tickerName, price) {
       this.tickers.filter(t => t.name === tickerName).forEach(t => {
+        if (t === this.sel) {
+          this.graph.push(price)
+          if (this.graph.length > this.maxGraphElements) {
+            this.graph.shift()
+          }
+        }
         t.price = price
       })
     },
 
-    add() {
+    calculateMaxGraphEl() {
+      if (!this.$refs.graph) {
+        return
+      }
+      this.maxGraphElements = this.$refs.graph.clientWidth / 38
+    },
+
+    add(ticker) {
       const newTickers = {
-        name: this.ticker.toUpperCase(),
+        name: ticker.toUpperCase(),
         price: "-"
       }
       const index = this.tickers.findIndex(t => t.name === newTickers.name)
       if (index === -1) {
         this.tickers = [...this.tickers, newTickers]
         subscribeToTicker(newTickers.name, newPrice =>
-        this.upDateTicker(newTickers.name, newPrice)
+            this.upDateTicker(newTickers.name, newPrice)
         )
-        this.ticker = ""
+        console.log(this.allCoin)
+        ticker = ""
         this.double = false
       } else {
         this.double = true
@@ -301,7 +249,6 @@ export default {
 
     select(ticker) {
       this.sel = ticker
-
     }
   },
 
@@ -312,6 +259,9 @@ export default {
     },
     sel() {
       this.graph = []
+      this.$nextTick(() => {
+        this.calculateMaxGraphEl()
+      })
     },
 
     paginationTickers() {
@@ -322,6 +272,7 @@ export default {
 
     filter() {
       this.page = 1
+      this.filter = this.filter.toUpperCase()
     },
     pageStateOptions(v) {
       window.history.pushState(
