@@ -109,7 +109,7 @@
         </svg>
         </button>
       </section>
-<!--      <graph-for-crypto-coin :sel="sel"/>-->
+<!--      <graph-for-crypto-coin :selectTicker="sel" :graph="graph" />-->
     </div>
   </div>
 
@@ -134,7 +134,6 @@ export default {
 
       tickers: [],
       allCoin: [],
-      maxGraphElements: 1,
       sel: null,
       double: false,
       page: 1,
@@ -143,8 +142,6 @@ export default {
     }
   },
   mounted() {
-
-
     window.addEventListener('resize', this.calculateMaxGraphEl)
   },
   created() {

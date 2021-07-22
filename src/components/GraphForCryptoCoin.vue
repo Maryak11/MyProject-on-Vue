@@ -46,12 +46,43 @@
 export default {
   props: {
     selectTicker: {
-      type: {
-        name: String,
-        price: String
-      },
       required: false,
       default: false
+    },
+    graph: {
+      required: false,
+      default: false
+    }
+  },
+  data() {
+    return {
+      maxGraphElements: 1,
+    }
+  },
+
+  computed: {
+    normalizeGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+      return this.graph.map(
+          price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+  },
+  methods: {
+    calculateMaxGraphEl() {
+      if (!this.$refs.graph) {
+        return
+      }
+      this.maxGraphElements = this.$refs.graph.clientWidth / 38
+    },
+  },
+  watch: {
+    selectTicker() {
+      this.graph = []
+      this.$nextTick(() => {
+        this.calculateMaxGraphEl()
+      })
     },
   }
 }
